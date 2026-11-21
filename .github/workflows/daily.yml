@@ -11,11 +11,19 @@ jobs:
   visit:
     runs-on: ubuntu-latest
     steps:
-      - name: Visit website
+     
+      - name: Visit websites
         run: |
-          curl -L --max-time 30 \
-            -A "QR-Website-Monitor" \
-            -o /dev/null \
-            -sS \
-            -w "HTTP Status: %{http_code}\n" \
+          urls=(
             "https://www.costco.com.tw/Televisions-Appliances/Large-Appliances/c/301"
+            "https://www.google.com"
+            "https://www.google.com"
+          )
+
+          for url in "${urls[@]}"; do
+            echo "Checking: $url"
+            curl -L --fail --max-time 30 \
+              -sS -o /dev/null \
+              -w "HTTP Status: %{http_code}\n" \
+              "$url"
+          done
