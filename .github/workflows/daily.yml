@@ -18,4 +18,4 @@ jobs:
             -o /dev/null \
             -sS \
             -w "HTTP Status: %{http_code}\n" \
-            "https://example.com"
+            "https://www.costco.com.tw/Televisions-Appliances/Large-Appliances/c/301"
