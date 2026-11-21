@@ -1,101 +1,51 @@
 name: QR Website Scheduler
 
 on:
-  schedule:
-    - cron: '*/15 0-13 * * *'
   workflow_dispatch:
 
 jobs:
   visit:
-    # Pause automatic scheduled checks while preserving manual checks.
-    if: ${{ github.event_name != 'schedule' || vars.MONITOR_PAUSED != 'true' }}
     runs-on: ubuntu-latest
     env:
-      # Written by the Apps Script control page as a JSON array.
+      # Apps Script stores the URL list here as a JSON array.
       MONITOR_URLS_JSON: ${{ vars.MONITOR_URLS }}
     steps:
       - name: Check websites
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
 
-          # Use the existing sites until the control page saves MONITOR_URLS.
-          if ! urls_text="$(python3 - <<'PY'
-          import ipaddress
+          urls_text="$(python3 - <<'PY'
           import json
           import os
-          import re
           import sys
-          from urllib.parse import urlsplit, urlunsplit
 
-          defaults = [
-              "https://www.google.com"
-          ]
           raw = os.environ.get("MONITOR_URLS_JSON", "").strip()
-
           try:
-              urls = json.loads(raw) if raw else defaults
-              if not isinstance(urls, list) or not urls:
-                  raise ValueError("URL list must be a non-empty JSON array")
-              if len(urls) > 10:
-                  raise ValueError("At most 10 URLs are allowed")
+              urls = json.loads(raw) if raw else ["https://www.google.com"]
+              if not isinstance(urls, list) or not urls or len(urls) > 10:
+                  raise ValueError("Use 1 to 10 website URLs")
 
               unique = []
               seen = set()
-              for item in urls:
-                  if not isinstance(item, str):
+              for url in urls:
+                  if not isinstance(url, str):
                       raise ValueError("Each URL must be text")
-                  value = item.strip()
-                  if not value or len(value) > 2048 or "\n" in value or "\r" in value:
-                      raise ValueError("A URL is empty, too long, or malformed")
-
-                  parts = urlsplit(value)
-                  scheme = parts.scheme.lower()
-                  host = (parts.hostname or "").lower().rstrip(".")
-                  if scheme not in ("http", "https") or not host:
-                      raise ValueError("Only complete http:// or https:// URLs are allowed")
-                  if parts.username or parts.password:
-                      raise ValueError("URLs must not contain usernames or passwords")
-                  if host == "localhost" or host.endswith((".local", ".internal", ".test", ".example")):
-                      raise ValueError("Local or private host names are not allowed")
-                  try:
-                      ipaddress.ip_address(host)
-                      raise ValueError("IP-address URLs are not allowed")
-                  except ValueError as exc:
-                      if str(exc) == "IP-address URLs are not allowed":
-                          raise
-                  labels = host.split(".")
-                  if len(labels) < 2 or any(
-                      not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
-                      for label in labels
-                  ):
-                      raise ValueError("A public domain name is required")
-                  try:
-                      port = parts.port
-                  except ValueError:
-                      raise ValueError("The URL port is invalid")
-                  if port not in (None, 80, 443):
-                      raise ValueError("Only standard web ports are allowed")
-
-                  netloc = host
-                  if port and not ((scheme == "http" and port == 80) or (scheme == "https" and port == 443)):
-                      netloc += ":" + str(port)
-                  normalized = urlunsplit((scheme, netloc, parts.path or "/", parts.query, ""))
-                  if normalized not in seen:
-                      seen.add(normalized)
-                      unique.append(normalized)
+                  url = url.strip()
+                  if not url.startswith(("https://", "http://")) or "\n" in url or "\r" in url:
+                      raise ValueError("Each URL must start with http:// or https://")
+                  if url not in seen:
+                      seen.add(url)
+                      unique.append(url)
 
               if not unique:
-                  raise ValueError("At least one unique URL is required")
+                  raise ValueError("Add at least one website URL")
               print("\n".join(unique))
-          except Exception as exc:
-              print("Invalid MONITOR_URLS configuration: " + str(exc), file=sys.stderr)
+          except (json.JSONDecodeError, ValueError) as error:
+              print("Invalid MONITOR_URLS: " + str(error), file=sys.stderr)
               sys.exit(1)
           PY
-          )"; then
-            echo "::error::Unable to load the website list. Check MONITOR_URLS in repository Actions variables."
-            exit 1
-          fi
+          )"
 
           mapfile -t urls <<< "$urls_text"
           failed=0
@@ -105,7 +55,7 @@ jobs:
             display_url="${url%%\?*}"
             echo "Checking: $display_url"
 
-            if status=$(curl -L -sS \
+            if status=$(curl -f -L -sS \
               --max-time 30 \
               -o /dev/null \
               -w "%{http_code}" \
