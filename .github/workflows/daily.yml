@@ -10,7 +10,7 @@ jobs:
   visit:
     runs-on: ubuntu-latest
 
-        steps:
+    steps:
       - name: Check websites
         shell: bash
         run: |
