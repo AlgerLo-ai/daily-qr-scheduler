@@ -10,9 +10,10 @@ on:
 jobs:
   visit:
     runs-on: ubuntu-latest
-    steps:
-     
-      - name: Visit websites
+
+        steps:
+      - name: Check websites
+        shell: bash
         run: |
           urls=(
             "https://www.costco.com.tw/Televisions-Appliances/Large-Appliances/c/301"
@@ -20,10 +21,21 @@ jobs:
             "https://www.google.com"
           )
 
+          failed=0
+
           for url in "${urls[@]}"; do
             echo "Checking: $url"
-            curl -L --fail --max-time 30 \
-              -sS -o /dev/null \
-              -w "HTTP Status: %{http_code}\n" \
-              "$url"
+
+            if status=$(curl -L -sS \
+              --max-time 30 \
+              -o /dev/null \
+              -w "%{http_code}" \
+              "$url"); then
+              echo "HTTP Status: $status"
+            else
+              echo "FAILED: $url (HTTP: ${status:-No response})"
+              failed=1
+            fi
           done
+
+          exit "$failed"
