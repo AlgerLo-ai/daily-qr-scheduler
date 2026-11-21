@@ -60,6 +60,7 @@ jobs:
 
             if status=$(curl -f -L -sS \
               --max-time 30 \
+              -A "Mozilla/5.0 (compatible; QRWebsiteMonitor/1.0)" \
               -o /dev/null \
               -w "%{http_code}" \
               "$url"); then
