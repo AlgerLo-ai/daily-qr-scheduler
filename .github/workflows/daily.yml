@@ -1,0 +1,16 @@
+name: Daily QR Website Scheduler
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  open-website:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run daily task
+        run: echo "Daily scheduled task started"
